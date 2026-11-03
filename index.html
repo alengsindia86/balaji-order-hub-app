@@ -161,7 +161,14 @@ function escapeHtml(value){
 }
 function escapeAttr(value){return escapeHtml(value);}
 
-loadData();
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js")
+      .then(() => console.log("Balaji app ready"))
+      .catch(error => console.error("Service worker error:", error));
+  });
+}
+ loadData();
 setInterval(loadData,30000);
 </script>
 </body>

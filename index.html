@@ -40,26 +40,29 @@ details{margin-top:12px;border-top:1px solid #edf0f4;padding-top:10px;font-size:
 .event{padding:8px 0;border-bottom:1px solid #edf0f4;color:#596579}
 #updated{font-size:11px;color:#d0d7e3;margin-top:12px}
 #notice{text-align:center;padding:25px;color:#667085}
- .order-tools{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:8px;
+.order-tools{
+  display:flex;
+  gap:10px;
   margin-bottom:12px;
+  flex-wrap:wrap;
 }
 .order-tools button{
+  flex:1;
+  min-width:140px;
   border:0;
   border-radius:10px;
-  padding:12px 6px;
+  padding:14px;
   background:#17243a;
   color:white;
   font-weight:600;
-  font-size:12px;
+  font-size:14px;
 }
 .order-panel{
   background:white;
   padding:16px;
   border-radius:12px;
   margin-bottom:14px;
+  width:100%;
 }
 .order-panel h3{
   margin:0 0 12px;
@@ -89,6 +92,11 @@ details{margin-top:12px;border-top:1px solid #edf0f4;padding-top:10px;font-size:
 .order-panel p{
   font-size:13px;
   color:#596579;
+}
+@media(max-width:600px){
+  .order-tools button{
+    min-width:100%;
+  }
 }
 </style>
 </head>

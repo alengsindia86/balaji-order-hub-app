@@ -1,0 +1,165 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101827">
+<title>Balaji Order Hub</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f3f5f9;color:#182235;font-family:Arial,sans-serif}
+header{background:#101827;color:white;padding:22px 18px}
+header h1{font-size:23px;margin:0 0 6px}
+header p{margin:0;color:#c5cede;font-size:13px}
+main{max-width:850px;margin:auto;padding:15px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:15px}
+.stat{background:white;padding:14px 8px;border-radius:12px;text-align:center}
+.stat strong{display:block;font-size:23px}
+.stat span{font-size:11px;color:#687386}
+.search{width:100%;padding:14px;border:1px solid #dce1e9;border-radius:10px;font-size:15px;margin-bottom:12px}
+.tabs{display:flex;gap:7px;overflow-x:auto;margin-bottom:15px}
+.tabs button{border:0;border-radius:20px;padding:10px 14px;background:#e3e8f0;white-space:nowrap;font-weight:600}
+.tabs button.active{background:#17243a;color:white}
+.order{background:white;border-radius:13px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px #1822350d}
+.top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.orderid{font-weight:700;font-size:14px}
+.status{font-size:11px;padding:6px 9px;border-radius:20px;background:#fff1d6;color:#9a6500}
+.status.completed{background:#dcf7e7;color:#167443}
+.status.partial{background:#e6edff;color:#3159a8}
+.message{font-size:15px;line-height:1.5;margin:13px 0}
+.meta{font-size:12px;color:#697588;line-height:1.8}
+.progress{height:7px;background:#e9edf3;border-radius:8px;margin:10px 0;overflow:hidden}
+.progress div{height:100%;background:#2475df}
+.actions{display:flex;gap:14px;margin-top:10px;font-size:13px}
+a{color:#2467c9;text-decoration:none}
+details{margin-top:12px;border-top:1px solid #edf0f4;padding-top:10px;font-size:13px}
+.event{padding:8px 0;border-bottom:1px solid #edf0f4;color:#596579}
+#updated{font-size:11px;color:#d0d7e3;margin-top:12px}
+#notice{text-align:center;padding:25px;color:#667085}
+</style>
+</head>
+<body>
+<header>
+<h1>Balaji Order Hub</h1>
+<p>Order tracking · Balaji Enterprises</p>
+<div id="updated">Connecting...</div>
+</header>
+<main>
+<div class="stats">
+<div class="stat"><strong id="activeCount">–</strong><span>Active Orders</span></div>
+<div class="stat"><strong id="pendingCount">–</strong><span>Pending</span></div>
+<div class="stat"><strong id="partialCount">–</strong><span>Partial</span></div>
+</div>
+
+<input class="search" id="search" placeholder="Search order, dealer or message..." oninput="render()">
+
+<div class="tabs">
+<button class="active" data-tab="Active" onclick="setTab(this)">Active</button>
+<button data-tab="Pending" onclick="setTab(this)">Pending</button>
+<button data-tab="Partial" onclick="setTab(this)">Partial</button>
+<button data-tab="Completed" onclick="setTab(this)">Completed</button>
+<button data-tab="All" onclick="setTab(this)">All</button>
+</div>
+
+<div id="orders"><div id="notice">Loading orders...</div></div>
+</main>
+
+<script>
+const BRIDGE_URL = "https://script.google.com/macros/s/AKfycbxVv2iypWWoiYga8t9DyxRQJcFflqI2Ig0GnVUaz7SpNveBD3Z1o0FeQw0EQhNJX1DI4A/exec";
+
+let data = {Orders:[],Dispatches:[],Timeline:[]};
+let currentTab = "Active";
+let loading = false;
+
+function loadData(){
+ if(loading)return;
+ loading=true;
+ const callback="balajiCallback";
+ window[callback]=function(result){
+   data=result;
+   loading=false;
+   render();
+   document.getElementById("updated").textContent="Last updated: "+new Date().toLocaleTimeString();
+   delete window[callback];
+ };
+ const script=document.createElement("script");
+ script.src=BRIDGE_URL+"?callback="+callback+"&t="+Date.now();
+ script.onerror=function(){
+   loading=false;
+   document.getElementById("orders").innerHTML='<div id="notice">Could not load orders. Please refresh the page.</div>';
+ };
+ document.body.appendChild(script);
+ setTimeout(()=>{loading=false;},15000);
+}
+
+function setTab(button){
+ currentTab=button.dataset.tab;
+ document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("active"));
+ button.classList.add("active");
+ render();
+}
+
+function render(){
+ const orders=data.Orders||[];
+ const dispatches=data.Dispatches||[];
+ const timeline=data.Timeline||[];
+ const rows=orders.slice(1).filter(r=>r[0]);
+ const active=rows.filter(r=>String(r[5]).toLowerCase()!=="completed");
+ const pending=active.filter(r=>String(r[5]).toLowerCase()==="pending");
+ const partial=active.filter(r=>String(r[5]).toLowerCase()!=="pending");
+ document.getElementById("activeCount").textContent=active.length;
+ document.getElementById("pendingCount").textContent=pending.length;
+ document.getElementById("partialCount").textContent=partial.length;
+
+ const q=document.getElementById("search").value.toLowerCase();
+ let filtered=rows.filter(r=>{
+   const status=String(r[5]).toLowerCase();
+   if(currentTab==="Active" && status==="completed")return false;
+   if(currentTab==="Pending" && status!=="pending")return false;
+   if(currentTab==="Partial" && (status==="pending"||status==="completed"))return false;
+   if(currentTab==="Completed" && status!=="completed")return false;
+   return r.join(" ").toLowerCase().includes(q);
+ });
+ filtered.reverse();
+
+ const html=filtered.map(r=>{
+   const id=r[0];
+   const sent=dispatches.slice(1).filter(d=>d[1]===id)
+      .reduce((sum,d)=>sum+(Number(d[3])||0),0);
+   const total=Number(r[6])||0;
+   const remaining=Math.max(0,total-sent);
+   const percent=total?Math.min(100,Math.round(sent/total*100)):0;
+   const status=String(r[5]||"Pending");
+   const cls=status.toLowerCase()==="completed"?"completed":
+      status.toLowerCase().includes("partial")?"partial":"";
+   const events=timeline.slice(1).filter(t=>t[1]===id);
+   const photo=r[3]?`<a href="${escapeAttr(r[3])}" target="_blank" rel="noopener">View photo</a>`:"";
+   return `<article class="order">
+     <div class="top"><span class="orderid">${escapeHtml(id)}</span>
+     <span class="status ${cls}">${escapeHtml(status)}</span></div>
+     <div class="message">${escapeHtml(r[2]||"No message")}</div>
+     <div class="meta">Posted: ${escapeHtml(r[1]||"—")}<br>
+     Initials: ${escapeHtml(r[4]||"—")}<br>
+     Quantity: ${total} · Dispatched: ${sent} · Remaining: ${remaining}</div>
+     <div class="progress"><div style="width:${percent}%"></div></div>
+     <div class="meta">${percent}% dispatched</div>
+     <div class="actions">${photo}</div>
+     <details><summary>View Timeline (${events.length})</summary>
+     ${events.length?events.map(e=>`<div class="event">${escapeHtml(e[2]||"")} · ${escapeHtml(e[3]||"")} ${escapeHtml(e[4]||"")}</div>`).join(""):"<p>No timeline events</p>"}
+     </details>
+   </article>`;
+ }).join("");
+ document.getElementById("orders").innerHTML=html||'<div id="notice">No orders found.</div>';
+}
+
+function escapeHtml(value){
+ return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function escapeAttr(value){return escapeHtml(value);}
+
+loadData();
+setInterval(loadData,30000);
+</script>
+</body>
+</html>

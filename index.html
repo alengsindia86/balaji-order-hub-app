@@ -40,6 +40,60 @@ details{margin-top:12px;border-top:1px solid #edf0f4;padding-top:10px;font-size:
 .event{padding:8px 0;border-bottom:1px solid #edf0f4;color:#596579}
 #updated{font-size:11px;color:#d0d7e3;margin-top:12px}
 #notice{text-align:center;padding:25px;color:#667085}
+.quick-actions{
+  position:fixed;
+  right:20px;
+  bottom:25px;
+  z-index:9999;
+}
+.plus-button{
+  width:58px;
+  height:58px;
+  border:0;
+  border-radius:50%;
+  background:#17243a;
+  color:white;
+  font-size:32px;
+  box-shadow:0 4px 15px #0003;
+}
+.quick-menu{
+  position:absolute;
+  bottom:70px;
+  right:0;
+  width:190px;
+  padding:8px;
+  background:white;
+  border-radius:12px;
+  box-shadow:0 5px 20px #0003;
+}
+.quick-menu button{
+  width:100%;
+  padding:13px;
+  border:0;
+  background:white;
+  text-align:left;
+  border-radius:8px;
+  font-size:14px;
+}
+.order-panel textarea,
+.order-panel input,
+.order-panel select{
+  width:100%;
+  padding:13px;
+  margin:8px 0;
+  border:1px solid #dce1e9;
+  border-radius:9px;
+  font-size:15px;
+}
+.order-panel button{
+  padding:13px;
+  margin:5px 0;
+  border:0;
+  border-radius:9px;
+  background:#2467c9;
+  color:white;
+  font-weight:bold;
+}
 </style>
 </head>
 <body>
@@ -53,8 +107,47 @@ details{margin-top:12px;border-top:1px solid #edf0f4;padding-top:10px;font-size:
 <div class="stat"><strong id="activeCount">–</strong><span>Active Orders</span></div>
 <div class="stat"><strong id="pendingCount">–</strong><span>Pending</span></div>
 <div class="stat"><strong id="partialCount">–</strong><span>Partial</span></div>
+<div class="stat"><strong id="completedCount">–</strong><span>Completed</span></div>
+</div>
+<div class="quick-actions">
+  <button class="plus-button" onclick="toggleQuickMenu()">+</button>
+  <div id="quickOptions" class="quick-menu" style="display:none">
+    <button onclick="showNewOrder()">＋ New Order</button>
+    <button onclick="showDispatch()">📦 Add Dispatch</button>
+   <button onclick="showComplete()">✅ Mark Completed</button>
+  </div>
 </div>
 
+<section id="newOrderPanel" class="order-panel" style="display:none">
+  <h2>Post New Order</h2>
+  <textarea id="orderMessage" placeholder="Enter order details"></textarea>
+  <input id="orderQuantity" type="number" min="1" placeholder="Total quantity">
+  <button onclick="submitNewOrder()">Post Order</button>
+  <button onclick="closeForms()">Cancel</button>
+  <p id="orderResult"></p>
+</section>
+
+<section id="dispatchPanel" class="order-panel" style="display:none">
+  <h2>Add Dispatch</h2>
+  <select id="dispatchOrder">
+    <option value="">Select order</option>
+  </select>
+  <input id="dispatchQuantity" type="number" min="1" placeholder="Quantity dispatched">
+  <input id="itemsSent" placeholder="Items sent">
+  <textarea id="dispatchRemarks" placeholder="Remarks (optional)"></textarea>
+  <button onclick="submitDispatch()">Save Dispatch</button>
+  <button onclick="closeForms()">Cancel</button>
+  <p id="dispatchResult"></p>
+</section>
+ <section id="completePanel" class="order-panel" style="display:none">
+  <h2>Mark Order Completed</h2>
+  <select id="completeOrder">
+    <option value="">Select order</option>
+  </select>
+  <button onclick="markOrderCompleted()">Mark as Completed</button>
+  <button onclick="closeForms()">Cancel</button>
+  <p id="completeResult"></p>
+</section>
 <input class="search" id="search" placeholder="Search order, dealer or message..." oninput="render()">
 
 <div class="tabs">
@@ -67,14 +160,227 @@ details{margin-top:12px;border-top:1px solid #edf0f4;padding-top:10px;font-size:
 
 <div id="orders"><div id="notice">Loading orders...</div></div>
 </main>
-
+<iframe
+  id="bridgeFrame"
+  src="https://script.google.com/macros/s/AKfycbxjRduqjejRESbPlZxAI6t-A8oEUjYdWrWc7hPPZYMWjJNXO__2z03hCm0qyodkgvmBgQ/exec?bridge=1"
+  style="display:none">
+</iframe>
 <script>
 const BRIDGE_URL = "https://script.google.com/macros/s/AKfycbxVv2iypWWoiYga8t9DyxRQJcFflqI2Ig0GnVUaz7SpNveBD3Z1o0FeQw0EQhNJX1DI4A/exec";
 
 let data = {Orders:[],Dispatches:[],Timeline:[]};
 let currentTab = "Active";
 let loading = false;
+function toggleQuickMenu(){
+  const menu=document.getElementById("quickOptions");
+  menu.style.display=menu.style.display==="none"?"block":"none";
+}
 
+function closeForms(){
+  document.getElementById("newOrderPanel").style.display="none";
+  document.getElementById("dispatchPanel").style.display="none";
+}
+
+function showNewOrder(){
+  closeForms();
+  document.getElementById("newOrderPanel").style.display="block";
+  document.getElementById("quickOptions").style.display="none";
+}
+
+function showDispatch(){
+  closeForms();
+  document.getElementById("dispatchPanel").style.display="block";
+  document.getElementById("quickOptions").style.display="none";
+  updateDispatchOptions();
+}
+function showComplete(){
+  closeForms();
+  document.getElementById("completePanel").style.display="block";
+  document.getElementById("quickOptions").style.display="none";
+  updateCompleteOptions();
+}
+document.addEventListener("click",function(event){
+  const menu=document.getElementById("quickOptions");
+  const button=document.querySelector(".plus-button");
+  if(menu && button && !menu.contains(event.target) && !button.contains(event.target)){
+    menu.style.display="none";
+  }
+});
+
+function sendWriteRequest(payload){
+  return new Promise((resolve,reject)=>{
+    const requestId="REQ-"+Date.now()+"-"+Math.random().toString(36).slice(2);
+    const frame=document.getElementById("bridgeFrame");
+
+    if(!frame || !frame.contentWindow){
+      reject(new Error("Bridge connection not found."));
+      return;
+    }
+
+    const timer=setTimeout(()=>{
+      delete pendingWriteRequests[requestId];
+      reject(new Error("Server timed out. Please try again."));
+    },20000);
+
+    pendingWriteRequests[requestId]={
+      resolve:result=>{clearTimeout(timer);resolve(result);},
+      reject:error=>{clearTimeout(timer);reject(error);}
+    };
+
+    frame.contentWindow.postMessage({
+      type:"BALAJI_REQUEST",
+      payload:{...payload,requestId}
+    },"*");
+  });
+}
+
+const pendingWriteRequests={};
+
+window.addEventListener("message",function(event){
+  const frame=document.getElementById("bridgeFrame");
+  if(!frame || event.source!==frame.contentWindow)return;
+  if(!event.data || event.data.type!=="BALAJI_RESPONSE")return;
+
+  const pending=pendingWriteRequests[event.data.requestId];
+  if(!pending)return;
+
+  delete pendingWriteRequests[event.data.requestId];
+
+  if(event.data.error)pending.reject(new Error(event.data.error));
+  else pending.resolve(event.data.result);
+});
+
+async function submitNewOrder(){
+  const message=document.getElementById("orderMessage").value.trim();
+  const quantity=Number(document.getElementById("orderQuantity").value);
+  const result=document.getElementById("orderResult");
+
+  if(!message || !Number.isInteger(quantity) || quantity<1){
+    result.textContent="Enter order details and a valid quantity.";
+    return;
+  }
+
+  result.textContent="Posting order...";
+
+  try{
+    const response=await sendWriteRequest({
+      action:"newOrder",message,quantity
+    });
+
+    if(!response.success)throw new Error(response.message);
+
+    result.textContent="Order posted: "+response.orderId;
+    document.getElementById("orderMessage").value="";
+    document.getElementById("orderQuantity").value="";
+    loadData();
+  }catch(error){
+    result.textContent=error.message;
+  }
+}
+
+function updateDispatchOptions(){
+  const select=document.getElementById("dispatchOrder");
+  if(!select)return;
+
+  const previous=select.value;
+  const orders=(data.Orders||[]).slice(1);
+  const dispatches=(data.Dispatches||[]).slice(1);
+
+  const available=orders.map(order=>{
+    const id=order[0];
+    const total=Number(order[6])||0;
+    const sent=dispatches.filter(d=>d[1]===id)
+      .reduce((sum,d)=>sum+(Number(d[3])||0),0);
+
+    return {
+      id,
+      message:order[2],
+      status:String(order[5]).toLowerCase(),
+      remaining:total-sent
+    };
+  }).filter(o=>o.id && o.status!=="completed" && o.remaining>0);
+
+  select.innerHTML='<option value="">Select an order</option>'+
+    available.map(o=>
+      `<option value="${escapeHtml(o.id)}">${escapeHtml(o.id)} — ${escapeHtml(o.message)} (${o.remaining} remaining)</option>`
+    ).join("");
+
+  if(available.some(o=>o.id===previous))select.value=previous;
+}
+function updateCompleteOptions(){
+  const select=document.getElementById("completeOrder");
+  if(!select)return;
+
+  const orders=(data.Orders||[]).slice(1);
+
+  const available=orders.filter(order=>{
+    const status=String(order[5]).toLowerCase();
+    return order[0] && status!=="completed";
+  });
+
+  select.innerHTML='<option value="">Select order</option>'+
+    available.map(order=>
+      `<option value="${escapeHtml(order[0])}">${escapeHtml(order[0])} — ${escapeHtml(order[2])}</option>`
+    ).join("");
+}
+async function submitDispatch(){
+  const orderId=document.getElementById("dispatchOrder").value;
+  const quantity=Number(document.getElementById("dispatchQuantity").value);
+  const itemsSent=document.getElementById("itemsSent").value.trim();
+  const remarks=document.getElementById("dispatchRemarks").value.trim();
+  const result=document.getElementById("dispatchResult");
+
+  if(!orderId || !Number.isInteger(quantity) || quantity<1){
+    result.textContent="Select an order and enter a valid quantity.";
+    return;
+  }
+
+  result.textContent="Saving dispatch...";
+
+  try{
+    const response=await sendWriteRequest({
+      action:"dispatch",orderId,quantity,itemsSent,remarks
+    });
+
+    if(!response.success)throw new Error(response.message);
+
+    result.textContent="Dispatch saved. Remaining: "+response.remaining;
+    document.getElementById("dispatchQuantity").value="";
+    document.getElementById("itemsSent").value="";
+    document.getElementById("dispatchRemarks").value="";
+    loadData();
+  }catch(error){
+    result.textContent=error.message;
+  }
+}
+ async function markOrderCompleted(){
+  const orderId=document.getElementById("completeOrder").value;
+  const result=document.getElementById("completeResult");
+
+  if(!orderId){
+    result.textContent="Please select an order.";
+    return;
+  }
+
+  if(!confirm("Are you sure you want to mark this order as completed?"))return;
+
+  result.textContent="Updating order...";
+
+  try{
+    const response=await sendWriteRequest({
+      action:"complete",
+      orderId
+    });
+
+    if(!response.success)throw new Error(response.message);
+
+    result.textContent="Order marked as completed.";
+    loadData();
+    updateCompleteOptions();
+  }catch(error){
+    result.textContent=error.message;
+  }
+}
 function loadData(){
  if(loading)return;
  loading=true;
@@ -114,7 +420,8 @@ function render(){
  document.getElementById("activeCount").textContent=active.length;
  document.getElementById("pendingCount").textContent=pending.length;
  document.getElementById("partialCount").textContent=partial.length;
-
+const completed=rows.filter(r=>String(r[5]).toLowerCase()==="completed");
+document.getElementById("completedCount").textContent=completed.length;
  const q=document.getElementById("search").value.toLowerCase();
  let filtered=rows.filter(r=>{
    const status=String(r[5]).toLowerCase();

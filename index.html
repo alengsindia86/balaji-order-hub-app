@@ -128,6 +128,32 @@ details{margin-top:12px;border-top:1px solid #edf0f4;padding-top:10px;font-size:
     min-width:100%;
   }
 }
+.quick-menu{
+  position:fixed !important;
+  right:20px !important;
+  bottom:25px !important;
+  top:auto !important;
+  z-index:9999 !important;
+  margin:0 !important;
+}
+
+.plus-button{
+  width:58px !important;
+  height:58px !important;
+  border-radius:50% !important;
+  font-size:34px !important;
+  box-shadow:0 5px 18px #0004 !important;
+}
+
+.quick-options{
+  position:absolute !important;
+  right:0 !important;
+  bottom:70px !important;
+  top:auto !important;
+  width:230px !important;
+  border-radius:14px !important;
+  box-shadow:0 5px 25px #0003 !important;
+}
 </style>
 </head>
 <body>
@@ -209,7 +235,22 @@ function toggleQuickMenu(){
   menu.style.display =
     menu.style.display === "none" ? "block" : "none";
 }
-function showAccess(){
+function toggleQuickMenu(){
+  const menu = document.getElementById("quickOptions");
+  menu.style.display =
+    menu.style.display === "none" ? "block" : "none";
+}
+
+document.addEventListener("click", function(event){
+  const menu = document.getElementById("quickOptions");
+  const button = document.querySelector(".plus-button");
+
+  if(!menu.contains(event.target) && !button.contains(event.target)){
+    menu.style.display = "none";
+  }
+});
+
+ function showAccess(){
   document.getElementById("accessPanel").style.display = "block";
   document.getElementById("newOrderPanel").style.display = "none";
   document.getElementById("dispatchPanel").style.display = "none";
